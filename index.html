@@ -641,6 +641,7 @@ function loadData(){
         opBody: String(t.opBody||'').slice(0,1000),
         opBid: String(t.opBid||''),
         opImg: t.opImg||null,
+        _op_deleted: Boolean(t._op_deleted),
       posts: Array.isArray(t.posts)?t.posts.filter(p=>p&&typeof p.body==='string').map(p=>({
         id:   Number(p.id)||0,
         name: String(p.name||'名無しさん').slice(0,30),
@@ -696,7 +697,7 @@ function renderThread(t){
     'レス数: '+t.posts.length+' / 作成: '+fmtDate(t.ts);
 
   const allPosts=[
-    {id:1,name:t.opName||'1',mail:'',body:t.opBody||'',ts:t.ts,bid:t.opBid||'',img:t.opImg||null},
+    {id:1,name:t.opName||'1',mail:'',body:t.opBody||'',ts:t.ts,bid:t.opBid||'',img:t.opImg||null,_deleted:t._op_deleted||false},
     ...t.posts.map((p,i)=>({...p,id:i+2}))
   ];
 
@@ -723,13 +724,14 @@ function renderThread(t){
     }
     header.appendChild(idSpan);
 
-    // 管理者削除ボタン（1番目=スレ主レスは削除不可）
-    if(isAdmin && p.id > 1){
+    // 管理者削除ボタン（全レス削除可）
+    if(isAdmin){
       const delBtn = document.createElement('button');
       delBtn.className = 'res-del-btn';
       delBtn.textContent = '[削除]';
       delBtn.style.display = 'inline';
-      delBtn.onclick = () => adminDeleteRes(p.id - 2); // posts配列インデックス
+      // 1レス目(スレ主)はopBodyを削除、2レス目以降はposts配列
+      delBtn.onclick = () => adminDeleteRes(p.id === 1 ? 'op' : p.id - 2);
       header.appendChild(delBtn);
     }
 
@@ -796,10 +798,17 @@ function adminDeleteRes(postIdx){
   const t = threads.find(t => t.id === currentThreadId);
   if(!t) return;
   if(!confirm('このレスを削除しますか？')) return;
-  // 削除フラグを立てる（レス番号は維持）
-  t.posts[postIdx]._deleted = true;
-  t.posts[postIdx].body = '';
-  t.posts[postIdx].img = null;
+  if(postIdx === 'op'){
+    // 1レス目（スレ主）の削除
+    t.opBody = '';
+    t.opImg = null;
+    t._op_deleted = true;
+  } else {
+    // 2レス目以降
+    t.posts[postIdx]._deleted = true;
+    t.posts[postIdx].body = '';
+    t.posts[postIdx].img = null;
+  }
   saveData();
   renderThread(t);
 }
@@ -836,7 +845,7 @@ function postReply(){
 // ━━━━━━━━━━━━━━━━━━━━━━━━
 // 管理者・注目ニュース
 // ━━━━━━━━━━━━━━━━━━━━━━━━
-const ADMIN_PW_HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // "password" のSHA256 → 変更可
+const ADMIN_PW_HASH = '384fde3636e6e01e0194d2976d8f26410af3e846e573379cb1a09e2f0752d8cc'; // "password" のSHA256 → 変更可
 let isAdmin = false;
 
 // デフォルトニュース
